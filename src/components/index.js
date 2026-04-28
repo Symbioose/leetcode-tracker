@@ -4,3 +4,6 @@ export { default as StatsCard } from "./StatsCard";
 export { default as ProblemTable } from "./ProblemTable";
 export { default as CircularStatsCard } from "./CircularStatsCard";
 export { default as ExportImportControls } from "./ExportImportControls";
+export { default as DailySession } from "./DailySession";
+export { default as ActivityHeatmap } from "./ActivityHeatmap";
+export { default as StudyPlan } from "./StudyPlan";
