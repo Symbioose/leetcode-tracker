@@ -7,3 +7,4 @@ export { default as ExportImportControls } from "./ExportImportControls";
 export { default as DailySession } from "./DailySession";
 export { default as ActivityHeatmap } from "./ActivityHeatmap";
 export { default as StudyPlan } from "./StudyPlan";
+export { default as GistSyncPanel } from "./GistSyncPanel";

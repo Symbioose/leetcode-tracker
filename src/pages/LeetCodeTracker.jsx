@@ -9,10 +9,12 @@ import {
   DailySession,
   ActivityHeatmap,
   StudyPlan,
+  GistSyncPanel,
 } from "../components";
 import { blind75, leetcode75, neetcode150 } from "../data";
 import { getReviewDueDates, computeNextDueDate } from "../utils/spacedRepetition";
 import { useActivity } from "../hooks/useActivity";
+import { useGistSync } from "../hooks/useGistSync";
 
 const problemLists = {
   "Blind 75": blind75,
@@ -52,6 +54,7 @@ const LeetCodeTracker = () => {
   const [sessionOpen, setSessionOpen] = useState(false);
 
   const { activity, recordActivity, streaks } = useActivity();
+  const gistSync = useGistSync(progress, setProgress);
 
   useEffect(() => {
     try {
@@ -246,6 +249,8 @@ const LeetCodeTracker = () => {
               >
                 <Map size={16} /> Roadmap <ExternalLink size={14} />
               </a>
+
+              <GistSyncPanel {...gistSync} />
             </div>
           </div>
 
