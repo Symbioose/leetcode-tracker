@@ -88,13 +88,13 @@ const GistSyncPanel = ({ token, saveToken, gistId, push, pull, disconnect, statu
               </button>
 
               <a
-                href="https://github.com/settings/tokens/new?description=LeetCode+Tracker&scopes=gist"
+                href="https://github.com/settings/tokens"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
               >
                 <ExternalLink size={11} />
-                Créer un token GitHub (scope: gist seulement)
+                github.com/settings/tokens → Tokens (classic) → scope: gist
               </a>
 
               {syncError && (
