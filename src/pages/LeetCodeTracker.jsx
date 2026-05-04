@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Info, ExternalLink, Map, Play } from "lucide-react";
+import { Info, ExternalLink, Map as MapIcon, Play } from "lucide-react";
 import {
   Filters,
-  StatsCard,
   ProblemTable,
   ExportImportControls,
   CircularStatsCard,
@@ -11,22 +10,14 @@ import {
   StudyPlan,
   GistSyncPanel,
 } from "../components";
-import { blind75, leetcode75, neetcode150 } from "../data";
+import { neetcode150 } from "../data";
 import { getReviewDueDates, computeNextDueDate } from "../utils/spacedRepetition";
+import { migrateToNeetcode150, reshapeProgress } from "../utils/migrateToNeetcode150";
 import { useActivity } from "../hooks/useActivity";
 import { useGistSync } from "../hooks/useGistSync";
 
-const problemLists = {
-  "Blind 75": blind75,
-  "LeetCode 75": leetcode75,
-  "NeetCode 150": neetcode150,
-};
-
-const roadmapLinks = {
-  "Blind 75": "https://leetcode.com/problem-list/oizxjoit/",
-  "LeetCode 75": "https://leetcode.com/studyplan/leetcode-75/",
-  "NeetCode 150": "https://neetcode.io/roadmap",
-};
+const LIST_NAME = "NeetCode 150";
+const ROADMAP_URL = "https://neetcode.io/roadmap";
 
 const EMPTY_PROB = {
   solved: false,
@@ -36,13 +27,16 @@ const EMPTY_PROB = {
   dates: {},
 };
 
+// Run the migration once before mounting state — avoids stale reads.
+migrateToNeetcode150();
+
 const LeetCodeTracker = () => {
   const [progress, setProgress] = useState(() => {
     try {
       const saved = localStorage.getItem("leetcode-progress-v2");
-      return saved ? JSON.parse(saved) : { "Blind 75": {}, "LeetCode 75": {}, "NeetCode 150": {} };
+      return saved ? JSON.parse(saved) : { [LIST_NAME]: {} };
     } catch {
-      return { "Blind 75": {}, "LeetCode 75": {}, "NeetCode 150": {} };
+      return { [LIST_NAME]: {} };
     }
   });
 
@@ -50,7 +44,6 @@ const LeetCodeTracker = () => {
   const [filterDifficulty, setFilterDifficulty] = useState("All");
   const [showOnlyDueToday, setShowOnlyDueToday] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [selectedList, setSelectedList] = useState("");
   const [sessionOpen, setSessionOpen] = useState(false);
 
   const { activity, recordActivity, streaks } = useActivity();
@@ -64,80 +57,79 @@ const LeetCodeTracker = () => {
     }
   }, [progress]);
 
-  const today = new Date().toISOString().split("T")[0];
-  const problems = problemLists[selectedList] || [];
-  const currentProgress = progress[selectedList] || {};
+  // Reshape on the fly if a Gist pull brought back the old multi-list schema.
+  useEffect(() => {
+    if (progress["Blind 75"] || progress["LeetCode 75"]) {
+      setProgress((prev) => reshapeProgress(prev));
+    }
+  }, [progress]);
 
-  // --- Toggle solve / review ---
+  const today = new Date().toISOString().split("T")[0];
+  const problems = neetcode150;
+  const currentProgress = progress[LIST_NAME] || {};
+
   const toggleComplete = (problemId, reviewIndex = null, feeling = null) => {
     const todayStr = new Date().toISOString().split("T")[0];
 
     setProgress((prev) => {
-      const listProgress = prev[selectedList] || {};
+      const listProgress = prev[LIST_NAME] || {};
       const current = listProgress[problemId] || { ...EMPTY_PROB };
+
+      let newProbState;
 
       if (reviewIndex === null) {
         const newSolved = !current.solved;
-        return {
-          ...prev,
-          [selectedList]: {
-            ...listProgress,
-            [problemId]: {
-              ...current,
-              solved: newSolved,
-              solvedDate: newSolved ? todayStr : null,
-              reviews: newSolved ? current.reviews : Array(5).fill(false),
-              feelings: newSolved ? current.feelings : Array(5).fill(null),
-              reviewDueDates: newSolved ? current.reviewDueDates : Array(5).fill(null),
-              dates: newSolved ? { ...current.dates, initial: todayStr } : {},
-            },
-          },
+        newProbState = {
+          ...current,
+          solved: newSolved,
+          solvedDate: newSolved ? todayStr : null,
+          reviews: newSolved ? current.reviews : Array(5).fill(false),
+          feelings: newSolved ? current.feelings : Array(5).fill(null),
+          reviewDueDates: newSolved ? current.reviewDueDates : Array(5).fill(null),
+          dates: newSolved ? { ...current.dates, initial: todayStr } : {},
         };
-      }
-
-      const newReviews = [...current.reviews];
-      newReviews[reviewIndex] = !newReviews[reviewIndex];
-      const newDates = { ...current.dates };
-      const newFeelings = [...(current.feelings || Array(5).fill(null))];
-      const newReviewDueDates = [...(current.reviewDueDates || Array(5).fill(null))];
-
-      if (newReviews[reviewIndex]) {
-        newDates[`review${reviewIndex + 1}`] = todayStr;
-        newFeelings[reviewIndex] = feeling;
-        const nextDate = computeNextDueDate(todayStr, reviewIndex, feeling);
-        if (nextDate && reviewIndex + 1 < 5) {
-          newReviewDueDates[reviewIndex + 1] = nextDate;
-        }
       } else {
-        delete newDates[`review${reviewIndex + 1}`];
-        newFeelings[reviewIndex] = null;
-        if (reviewIndex + 1 < 5) {
-          newReviewDueDates[reviewIndex + 1] = null;
+        const newReviews = [...current.reviews];
+        newReviews[reviewIndex] = !newReviews[reviewIndex];
+        const newDates = { ...current.dates };
+        const newFeelings = [...(current.feelings || Array(5).fill(null))];
+        const newReviewDueDates = [...(current.reviewDueDates || Array(5).fill(null))];
+
+        if (newReviews[reviewIndex]) {
+          newDates[`review${reviewIndex + 1}`] = todayStr;
+          newFeelings[reviewIndex] = feeling;
+          const nextDate = computeNextDueDate(todayStr, reviewIndex, feeling);
+          if (nextDate && reviewIndex + 1 < 5) {
+            newReviewDueDates[reviewIndex + 1] = nextDate;
+          }
+        } else {
+          delete newDates[`review${reviewIndex + 1}`];
+          newFeelings[reviewIndex] = null;
+          if (reviewIndex + 1 < 5) {
+            newReviewDueDates[reviewIndex + 1] = null;
+          }
         }
+
+        newProbState = {
+          ...current,
+          reviews: newReviews,
+          dates: newDates,
+          feelings: newFeelings,
+          reviewDueDates: newReviewDueDates,
+        };
       }
 
       return {
         ...prev,
-        [selectedList]: {
-          ...listProgress,
-          [problemId]: {
-            ...current,
-            reviews: newReviews,
-            dates: newDates,
-            feelings: newFeelings,
-            reviewDueDates: newReviewDueDates,
-          },
-        },
+        [LIST_NAME]: { ...listProgress, [problemId]: newProbState },
       };
     });
 
-    // Record activity when marking anything as done
-    const prob = (progress[selectedList] || {})[problemId] || {};
+    const prob = (progress[LIST_NAME] || {})[problemId] || {};
     if (reviewIndex === null && !prob.solved) recordActivity();
     if (reviewIndex !== null && !prob.reviews?.[reviewIndex]) recordActivity();
   };
 
-  // --- Stats ---
   const categories = ["All", ...Array.from(new Set(problems.flatMap((p) => p.topics || [])))];
   const difficulties = ["All", "Easy", "Medium", "Hard"];
 
@@ -149,7 +141,6 @@ const LeetCodeTracker = () => {
     hard: problems.filter((p) => p.difficulty === "Hard" && currentProgress[p.id]?.solved).length,
   };
 
-  // --- Due today count ---
   const getDueProblems = () =>
     problems.filter((problem) => {
       const prob = currentProgress[problem.id];
@@ -157,24 +148,19 @@ const LeetCodeTracker = () => {
       return getReviewDueDates(prob).some((date, idx) => !prob.reviews?.[idx] && date <= today);
     }).length;
 
-  // --- Record a timed solve ---
   const recordTime = (problemId, durationSeconds) => {
     const todayStr = new Date().toISOString().split("T")[0];
     setProgress((prev) => {
-      const listProgress = prev[selectedList] || {};
+      const listProgress = prev[LIST_NAME] || {};
       const current = listProgress[problemId] || { ...EMPTY_PROB };
       const timeLogs = [...(current.timeLogs || []), { date: todayStr, duration: durationSeconds }];
       return {
         ...prev,
-        [selectedList]: {
-          ...listProgress,
-          [problemId]: { ...current, timeLogs },
-        },
+        [LIST_NAME]: { ...listProgress, [problemId]: { ...current, timeLogs } },
       };
     });
   };
 
-  // --- Items for daily session (due + overdue, not yet reviewed) ---
   const getDueItems = () => {
     const items = [];
     problems.forEach((problem) => {
@@ -194,60 +180,44 @@ const LeetCodeTracker = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 transition-colors">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
-                CodeTrack Pro — {selectedList || "Select a list"}
+                CodeTrack Pro — {LIST_NAME}
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
                 Track your progress with spaced repetition
               </p>
             </div>
             <div className="flex flex-wrap gap-2 items-center">
-              <select
-                value={selectedList}
-                title="Select a problem list"
-                onChange={(e) => setSelectedList(e.target.value)}
-                className="px-4 py-2 cursor-pointer rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none"
+              <button
+                onClick={() => setSessionOpen(true)}
+                disabled={dueItems.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded font-semibold transition-colors ${
+                  dueItems.length > 0
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                }`}
+                title={dueItems.length > 0 ? `${dueItems.length} review(s) due` : "No reviews due today"}
               >
-                <option value="" disabled>Select List</option>
-                {Object.keys(problemLists).map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-
-              {/* Daily session button */}
-              {selectedList && (
-                <button
-                  onClick={() => setSessionOpen(true)}
-                  disabled={dueItems.length === 0}
-                  className={`flex items-center gap-2 px-4 py-2 rounded font-semibold transition-colors ${
-                    dueItems.length > 0
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                  }`}
-                  title={dueItems.length > 0 ? `${dueItems.length} review(s) due` : "No reviews due today"}
-                >
-                  <Play size={16} />
-                  Start Session
-                  {dueItems.length > 0 && (
-                    <span className="bg-white/30 text-white text-xs px-1.5 py-0.5 rounded-full">
-                      {dueItems.length}
-                    </span>
-                  )}
-                </button>
-              )}
+                <Play size={16} />
+                Start Session
+                {dueItems.length > 0 && (
+                  <span className="bg-white/30 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {dueItems.length}
+                  </span>
+                )}
+              </button>
 
               <a
-                href={roadmapLinks[selectedList]}
+                href={ROADMAP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
                 title="View the official roadmap"
               >
-                <Map size={16} /> Roadmap <ExternalLink size={14} />
+                <MapIcon size={16} /> Roadmap <ExternalLink size={14} />
               </a>
 
               <GistSyncPanel {...gistSync} />
@@ -297,15 +267,10 @@ const LeetCodeTracker = () => {
           </div>
         )}
 
-        {/* Study plan */}
-        {selectedList && (
-          <StudyPlan stats={stats} activity={activity} />
-        )}
+        <StudyPlan stats={stats} activity={activity} />
 
-        {/* Activity heatmap */}
         <ActivityHeatmap activity={activity} streaks={streaks} />
 
-        {/* Stats */}
         <CircularStatsCard
           stats={{
             total: stats.total,
@@ -343,7 +308,6 @@ const LeetCodeTracker = () => {
         />
       </div>
 
-      {/* Daily Session Modal */}
       <DailySession
         isOpen={sessionOpen}
         onClose={() => setSessionOpen(false)}
