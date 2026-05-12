@@ -11,7 +11,12 @@ import {
   GistSyncPanel,
 } from "../components";
 import { neetcode150 } from "../data";
-import { getReviewDueDates, computeNextDueDate } from "../utils/spacedRepetition";
+import {
+  getReviewDueDates,
+  computeNextSchedule,
+  initialGaps,
+  EF_INIT,
+} from "../utils/spacedRepetition";
 import { migrateToNeetcode150, reshapeProgress } from "../utils/migrateToNeetcode150";
 import { useActivity } from "../hooks/useActivity";
 import { useGistSync } from "../hooks/useGistSync";
@@ -24,6 +29,8 @@ const EMPTY_PROB = {
   reviews: Array(5).fill(false),
   feelings: Array(5).fill(null),
   reviewDueDates: Array(5).fill(null),
+  gaps: Array(5).fill(null),
+  easeFactor: EF_INIT,
   dates: {},
 };
 
@@ -86,6 +93,8 @@ const LeetCodeTracker = () => {
           reviews: newSolved ? current.reviews : Array(5).fill(false),
           feelings: newSolved ? current.feelings : Array(5).fill(null),
           reviewDueDates: newSolved ? current.reviewDueDates : Array(5).fill(null),
+          gaps: newSolved ? initialGaps() : Array(5).fill(null),
+          easeFactor: newSolved ? (current.easeFactor ?? EF_INIT) : EF_INIT,
           dates: newSolved ? { ...current.dates, initial: todayStr } : {},
         };
       } else {
@@ -94,19 +103,24 @@ const LeetCodeTracker = () => {
         const newDates = { ...current.dates };
         const newFeelings = [...(current.feelings || Array(5).fill(null))];
         const newReviewDueDates = [...(current.reviewDueDates || Array(5).fill(null))];
+        const newGaps = [...(current.gaps || Array(5).fill(null))];
+        let newEaseFactor = current.easeFactor ?? EF_INIT;
 
         if (newReviews[reviewIndex]) {
           newDates[`review${reviewIndex + 1}`] = todayStr;
           newFeelings[reviewIndex] = feeling;
-          const nextDate = computeNextDueDate(todayStr, reviewIndex, feeling);
-          if (nextDate && reviewIndex + 1 < 5) {
-            newReviewDueDates[reviewIndex + 1] = nextDate;
+          const next = computeNextSchedule(todayStr, reviewIndex, feeling, current);
+          newEaseFactor = next.easeFactor;
+          if (next.dueDate && reviewIndex + 1 < 5) {
+            newReviewDueDates[reviewIndex + 1] = next.dueDate;
+            newGaps[reviewIndex + 1] = next.gap;
           }
         } else {
           delete newDates[`review${reviewIndex + 1}`];
           newFeelings[reviewIndex] = null;
           if (reviewIndex + 1 < 5) {
             newReviewDueDates[reviewIndex + 1] = null;
+            newGaps[reviewIndex + 1] = null;
           }
         }
 
@@ -116,6 +130,8 @@ const LeetCodeTracker = () => {
           dates: newDates,
           feelings: newFeelings,
           reviewDueDates: newReviewDueDates,
+          gaps: newGaps,
+          easeFactor: newEaseFactor,
         };
       }
 
@@ -241,25 +257,30 @@ const LeetCodeTracker = () => {
               How Adaptive Spaced Repetition Works
             </h3>
             <div className="text-blue-700 dark:text-blue-200 space-y-2">
-              <p>Reviews adapt based on how you felt — Easy intervals double, Hard intervals halve.</p>
+              <p>
+                SM-2 inspired. Each problem has its own ease factor (init 2.5,
+                clampé entre 1.3 et 3.0). Le prochain intervalle compound :
+                <code className="mx-1 px-1 rounded bg-white/60 dark:bg-black/30">nextGap = round(prevGap × EF)</code>.
+                Plus tu maîtrises, plus l'écart s'allonge.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
-                  <h4 className="font-semibold mb-2">Base Schedule:</h4>
+                  <h4 className="font-semibold mb-2">Schedule (medium, EF init 2.5)</h4>
                   <ul className="space-y-1 text-sm">
-                    <li><strong>R1:</strong> +1 day</li>
-                    <li><strong>R2:</strong> +3 days</li>
-                    <li><strong>R3:</strong> +7 days (1 week)</li>
-                    <li><strong>R4:</strong> +14 days (2 weeks)</li>
-                    <li><strong>R5:</strong> +30 days (1 month)</li>
+                    <li><strong>R1:</strong> +1 day (seed)</li>
+                    <li><strong>R2:</strong> +6 days (seed)</li>
+                    <li><strong>R3:</strong> +15 days (6 × EF)</li>
+                    <li><strong>R4:</strong> +38 days (15 × EF)</li>
+                    <li><strong>R5:</strong> +95 days (38 × EF)</li>
                   </ul>
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-2">Feeling Adjustments:</h4>
+                  <h4 className="font-semibold mb-2">Feeling impact</h4>
                   <ul className="space-y-1 text-sm">
-                    <li><strong>Easy (green dot):</strong> next interval ×2</li>
-                    <li><strong>Medium (yellow dot):</strong> no change</li>
-                    <li><strong>Hard (red dot):</strong> next interval ×0.5</li>
-                    <li className="mt-2">Use "Start Session" to review due problems one by one.</li>
+                    <li><strong>Easy (green):</strong> EF +0.15 → écarts plus longs durablement</li>
+                    <li><strong>Medium (jaune):</strong> EF inchangé</li>
+                    <li><strong>Hard (rouge):</strong> EF −0.20 et prochain gap divisé par 2 — tu reverras vite</li>
+                    <li className="mt-2 text-xs opacity-80">L'EF est par-problème : un exo facile pour toi finit par sortir tous les ~3 mois, un exo dur reste à quelques jours.</li>
                   </ul>
                 </div>
               </div>

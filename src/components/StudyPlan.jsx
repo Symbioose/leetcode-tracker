@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
 import { Target, TrendingUp, TrendingDown, Minus, CalendarDays } from 'lucide-react';
 
-const TARGET_DATE = new Date(2026, 10, 30); // November 30, 2026
+// 75-day NeetCode 150 challenge, starting May 4, 2026 → ends July 18, 2026.
+const START_DATE = new Date(2026, 4, 4); // May 4, 2026
+const PLAN_DAYS = 75;
+const PROBLEMS_PER_DAY = 2;
+const TARGET_DATE = new Date(START_DATE);
+TARGET_DATE.setDate(START_DATE.getDate() + PLAN_DAYS);
 
 const daysBetween = (a, b) => Math.round((b - a) / 86400000);
 
@@ -9,57 +14,52 @@ const formatDate = (d) =>
   d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 const StudyPlan = ({ stats, activity }) => {
-  const { weeksLeft, daysLeft, requiredPerWeek, projectedDate, currentPace, timelinePercent, isOnTrack } =
+  const { daysLeft, requiredPerDay, projectedDate, currentPace, timelinePercent, isOnTrack } =
     useMemo(() => {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
 
       const daysLeft = Math.max(0, daysBetween(now, TARGET_DATE));
-      const weeksLeft = Math.max(1, daysLeft / 7);
       const remaining = stats.total - stats.solved;
-      const requiredPerWeek = remaining > 0 ? +(remaining / weeksLeft).toFixed(1) : 0;
+      const requiredPerDay = remaining > 0 && daysLeft > 0 ? +(remaining / daysLeft).toFixed(1) : 0;
 
-      // Current pace: problems solved in last 4 weeks
-      const fourWeeksAgo = new Date(now);
-      fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
-      const fwStr = [
-        fourWeeksAgo.getFullYear(),
-        String(fourWeeksAgo.getMonth() + 1).padStart(2, '0'),
-        String(fourWeeksAgo.getDate()).padStart(2, '0'),
+      // Current pace: actions/day over last 14 days (proxy for solved/reviewed problems).
+      const windowDays = 14;
+      const winStart = new Date(now);
+      winStart.setDate(winStart.getDate() - windowDays);
+      const winStartStr = [
+        winStart.getFullYear(),
+        String(winStart.getMonth() + 1).padStart(2, '0'),
+        String(winStart.getDate()).padStart(2, '0'),
       ].join('-');
 
-      // We use activity as a proxy (each action ≈ 1 problem/review, not perfect but indicative)
-      // Better: count solvedDates from progress — but we don't have that here.
-      // We'll show actions/week as pace indicator.
       const recentActivity = Object.entries(activity)
-        .filter(([date]) => date >= fwStr)
+        .filter(([date]) => date >= winStartStr)
         .reduce((sum, [, count]) => sum + count, 0);
-      const currentPace = +(recentActivity / 4).toFixed(1); // actions/week
+      const currentPace = +(recentActivity / windowDays).toFixed(1);
 
-      // Projected finish based on required pace
+      // Projected finish at current pace
       let projectedDate = null;
-      if (requiredPerWeek > 0 && currentPace > 0) {
-        const weeksNeeded = remaining / currentPace;
-        const projected = new Date(now);
-        projected.setDate(projected.getDate() + Math.ceil(weeksNeeded * 7));
-        projectedDate = projected;
-      } else if (remaining === 0) {
+      if (remaining === 0) {
         projectedDate = now;
+      } else if (currentPace > 0) {
+        const daysNeeded = Math.ceil(remaining / currentPace);
+        const projected = new Date(now);
+        projected.setDate(projected.getDate() + daysNeeded);
+        projectedDate = projected;
       }
 
-      // Timeline: progress from first solve date to target
-      const startDate = new Date(2026, 3, 28); // project start (today for simplicity)
-      const totalDays = daysBetween(startDate, TARGET_DATE);
-      const elapsed = daysBetween(startDate, now);
+      const totalDays = daysBetween(START_DATE, TARGET_DATE);
+      const elapsed = daysBetween(START_DATE, now);
       const timelinePercent = Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
 
-      // On track: projected finish <= target
       const isOnTrack = projectedDate ? projectedDate <= TARGET_DATE : null;
 
-      return { weeksLeft, daysLeft, requiredPerWeek, projectedDate, currentPace, timelinePercent, isOnTrack };
+      return { daysLeft, requiredPerDay, projectedDate, currentPace, timelinePercent, isOnTrack };
     }, [stats, activity]);
 
   const completion = stats.total > 0 ? Math.round((stats.solved / stats.total) * 100) : 0;
+  const dailyTargetLabel = Math.max(PROBLEMS_PER_DAY, Math.ceil(requiredPerDay));
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6 transition-colors">
@@ -77,16 +77,14 @@ const StudyPlan = ({ stats, activity }) => {
       {/* Timeline bar */}
       <div className="mb-5">
         <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mb-1">
-          <span>Apr 28</span>
-          <span>Nov 30, 2026</span>
+          <span>{formatDate(START_DATE)}</span>
+          <span>{formatDate(TARGET_DATE)}</span>
         </div>
         <div className="relative h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-          {/* Completion fill */}
           <div
             className="absolute inset-y-0 left-0 bg-blue-200 dark:bg-blue-900/50 rounded-full transition-all"
             style={{ width: `${completion}%` }}
           />
-          {/* Time elapsed cursor */}
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-orange-500"
             style={{ left: `${timelinePercent}%` }}
@@ -111,16 +109,16 @@ const StudyPlan = ({ stats, activity }) => {
 
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
           <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-            {requiredPerWeek}
+            {requiredPerDay}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">needed / week</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">needed / day</div>
         </div>
 
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
           <div className="text-xl font-bold text-gray-800 dark:text-white">
             {currentPace}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">actions / week (×4w)</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">actions / day (×14d)</div>
         </div>
 
         <div
@@ -160,10 +158,10 @@ const StudyPlan = ({ stats, activity }) => {
       {stats.total > 0 && (
         <div className="mt-4 text-xs text-gray-400 dark:text-gray-500 text-center">
           {stats.solved === 0
-            ? `Solve ${Math.ceil(requiredPerWeek)} problems/week to finish NeetCode 150 by Nov 30`
+            ? `Goal: ${PROBLEMS_PER_DAY} problems/day for ${PLAN_DAYS} days → finish by ${formatDate(TARGET_DATE)}`
             : stats.solved === stats.total
             ? '🎉 All problems solved — keep reviewing!'
-            : `${Math.ceil(requiredPerWeek)} problems/week · interviews start Sep 2026`}
+            : `${dailyTargetLabel} problems/day · ${daysLeft} days left to finish NeetCode 150`}
         </div>
       )}
     </div>

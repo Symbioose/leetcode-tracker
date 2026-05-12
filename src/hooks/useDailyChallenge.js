@@ -10,7 +10,6 @@ export const TASKS = [
   { id: "pitch",    label: "Pitch anglais",      target: "15 min PREP",       emoji: "🎤" },
   { id: "rubiks",   label: "Rubik's cube",       target: "10 min",            emoji: "🟥" },
   { id: "reading",  label: "Lecture Zero to One", target: "20 min",           emoji: "📖" },
-  { id: "post",     label: "Post / Story publique", target: "1 par jour",     emoji: "🚀" },
 ];
 
 export const TASK_COUNT = TASKS.length;

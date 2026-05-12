@@ -115,12 +115,16 @@ const HistoryCalendar = ({ history }) => {
     const WEEKS = 16;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-    start.setDate(today.getDate() - WEEKS * 7 + 1);
-    // Align to Monday
-    const day = start.getDay();
-    const offset = day === 0 ? 6 : day - 1;
-    start.setDate(start.getDate() - offset);
+
+    // End of grid = this week's Sunday so today is always included.
+    const dow = today.getDay(); // 0=Sun, 6=Sat
+    const daysToSunday = dow === 0 ? 0 : 7 - dow;
+    const end = new Date(today);
+    end.setDate(today.getDate() + daysToSunday);
+
+    // Start = WEEKS*7 - 1 days before that Sunday → lands on a Monday.
+    const start = new Date(end);
+    start.setDate(end.getDate() - (WEEKS * 7 - 1));
 
     const weeks = [];
     const cursor = new Date(start);
