@@ -14,7 +14,7 @@ const formatDate = (d) =>
   d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 const StudyPlan = ({ stats, activity }) => {
-  const { daysLeft, requiredPerDay, projectedDate, currentPace, timelinePercent, isOnTrack } =
+  const { daysLeft, requiredPerDay, projectedDate, currentPace, timelinePercent, isOnTrack, delta } =
     useMemo(() => {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
@@ -55,7 +55,11 @@ const StudyPlan = ({ stats, activity }) => {
 
       const isOnTrack = projectedDate ? projectedDate <= TARGET_DATE : null;
 
-      return { daysLeft, requiredPerDay, projectedDate, currentPace, timelinePercent, isOnTrack };
+      const daysSinceStart = Math.max(0, daysBetween(START_DATE, now));
+      const expectedByNow = Math.min(stats.total, daysSinceStart * PROBLEMS_PER_DAY);
+      const delta = Math.round(stats.solved - expectedByNow);
+
+      return { daysLeft, requiredPerDay, projectedDate, currentPace, timelinePercent, isOnTrack, delta };
     }, [stats, activity]);
 
   const completion = stats.total > 0 ? Math.round((stats.solved / stats.total) * 100) : 0;
@@ -153,6 +157,25 @@ const StudyPlan = ({ stats, activity }) => {
           </div>
         </div>
       </div>
+
+      {/* Retard / avance */}
+      {daysBetween(START_DATE, new Date()) > 0 && (
+        <div
+          className={`mt-4 flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-sm font-medium ${
+            delta === 0
+              ? 'bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400'
+              : delta > 0
+              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+              : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+          }`}
+        >
+          {delta === 0
+            ? 'Dans les temps exactement.'
+            : delta > 0
+            ? `${delta} problème${delta > 1 ? 's' : ''} d'avance sur l'objectif.`
+            : `${Math.abs(delta)} problème${Math.abs(delta) > 1 ? 's' : ''} de retard sur l'objectif.`}
+        </div>
+      )}
 
       {/* Motivation callout */}
       {stats.total > 0 && (
