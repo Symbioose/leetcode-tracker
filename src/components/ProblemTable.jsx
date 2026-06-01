@@ -242,6 +242,8 @@ const ProblemTable = ({
                       <div className="flex flex-wrap gap-2">
                         {dueDates.map((date, idx) => {
                           const isCompleted = prob.reviews?.[idx];
+                          const completedDate = prob.dates?.[`review${idx + 1}`];
+                          const displayDate = isCompleted && completedDate ? completedDate : date;
                           const overdue = !isCompleted && date < today;
                           const dueToday = !isCompleted && date === today;
                           const feeling = prob.feelings?.[idx];
@@ -279,7 +281,7 @@ const ProblemTable = ({
                                 <div className="relative">
                                   <button
                                     onClick={() => handleReviewClick(problem, idx, prob, isCompleted, date)}
-                                    title={`R${idx + 1} — Due ${formatDate(date)}${feeling ? ` — felt ${feeling}` : ""}`}
+                                    title={`R${idx + 1} — Due ${formatDate(date)}${completedDate ? ` — done ${formatDate(completedDate)}` : ""}${feeling ? ` — felt ${feeling}` : ""}`}
                                     className={`px-2 py-1 rounded text-xs border min-w-[40px] transition-colors ${
                                       isCompleted
                                         ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-600"
@@ -313,7 +315,7 @@ const ProblemTable = ({
                                 }`}
                               >
                                 <Calendar size={10} />
-                                {formatDate(date)}
+                                {formatDate(displayDate)}
                               </div>
                             </div>
                           );
