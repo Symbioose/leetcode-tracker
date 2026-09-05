@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Flame, Trophy, Play, Pause, RotateCcw, Check } from "lucide-react";
-import { useDailyChallenge, TASKS, dateKey } from "../hooks/useDailyChallenge";
+import { useDailyChallenge, tasksForDate, dateKey, todayKey } from "../hooks/useDailyChallenge";
+import { phaseForKey } from "../data/studyPlan";
 
 const formatTime = (seconds) => {
   const s = Math.max(0, Math.floor(seconds));
@@ -145,22 +146,25 @@ const HistoryCalendar = ({ history }) => {
     const dayMs = dateObj.getTime();
     const todayMs = today.getTime();
 
+    // Judge each day against the task list that was active on that date.
+    const dayTasks = tasksForDate(k);
     const entry = history[k];
     const completed = entry
-      ? TASKS.reduce((a, t) => a + (entry.tasks?.[t.id]?.done ? 1 : 0), 0)
+      ? dayTasks.reduce((a, t) => a + (entry.tasks?.[t.id]?.done ? 1 : 0), 0)
       : 0;
 
-    if (dayMs > todayMs) return { cls: "bg-gray-100 dark:bg-gray-800", label: "À venir", completed };
-    if (completed === TASKS.length) return { cls: "bg-emerald-500", label: "Complet", completed };
+    if (dayMs > todayMs) return { cls: "bg-gray-100 dark:bg-gray-800", label: "À venir", completed, total: dayTasks.length };
+    if (completed === dayTasks.length) return { cls: "bg-emerald-500", label: "Complet", completed, total: dayTasks.length };
     if (dayMs === todayMs) {
       return {
         cls: completed > 0 ? "bg-amber-300 dark:bg-amber-600" : "bg-gray-200 dark:bg-gray-700",
         label: "Aujourd'hui",
         completed,
+        total: dayTasks.length,
       };
     }
-    if (!entry || completed === 0) return { cls: "bg-gray-200 dark:bg-gray-700", label: "Vide", completed };
-    return { cls: "bg-rose-400 dark:bg-rose-600", label: "Manqué", completed };
+    if (!entry || completed === 0) return { cls: "bg-gray-200 dark:bg-gray-700", label: "Vide", completed, total: dayTasks.length };
+    return { cls: "bg-rose-400 dark:bg-rose-600", label: "Manqué", completed, total: dayTasks.length };
   };
 
   return (
@@ -168,7 +172,7 @@ const HistoryCalendar = ({ history }) => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Historique</h2>
         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-500" /> 8/8</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-500" /> complet</span>
           <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-rose-400 dark:bg-rose-600" /> manqué</span>
           <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-gray-200 dark:bg-gray-700" /> vide</span>
         </div>
@@ -177,12 +181,12 @@ const HistoryCalendar = ({ history }) => {
         {weeks.map((wk, wi) => (
           <div key={wi} className="flex flex-col gap-1">
             {wk.map(({ key, date }) => {
-              const { cls, label, completed } = dayState(key, date);
+              const { cls, label, completed, total } = dayState(key, date);
               const isToday = key === todayK;
               return (
                 <div
                   key={key}
-                  title={`${key} — ${label} (${completed}/${TASKS.length})`}
+                  title={`${key} — ${label} (${completed}/${total})`}
                   className={`h-4 w-4 rounded-sm transition-colors ${cls} ${
                     isToday ? "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-800 ring-amber-500" : ""
                   }`}
@@ -199,6 +203,7 @@ const HistoryCalendar = ({ history }) => {
 const DailyChallenge = () => {
   const {
     todayDay,
+    todayTasks,
     todayCompleted,
     totalTasks,
     history,
@@ -217,6 +222,7 @@ const DailyChallenge = () => {
     day: "numeric",
     month: "long",
   });
+  const currentPhase = phaseForKey(todayKey());
   const progressPct = (todayCompleted / totalTasks) * 100;
   const allDone = todayCompleted === totalTasks;
 
@@ -234,6 +240,11 @@ const DailyChallenge = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Une tâche ratée, le streak repart à 0.
               </p>
+              {currentPhase && (
+                <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-medium text-blue-700 dark:text-blue-300">
+                  Phase : {currentPhase.name} · {currentPhase.hoursLabel}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-6">
               <div className="text-center">
@@ -291,7 +302,7 @@ const DailyChallenge = () => {
 
         {/* Tasks grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {TASKS.map((task) => (
+          {todayTasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}

@@ -1,8 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { PLAN_PHASES } from "../data/studyPlan";
 
 const STORAGE_KEY = "daily-challenge-v1";
 
-export const TASKS = [
+// Task lists per plan phase. Each history day is judged against the list that
+// was active on that date, so past streaks and completed days stay intact.
+
+// Original list — everything before the Thailand departure.
+const TASKS_LEGACY = [
   { id: "leetcode", label: "LeetCode", target: "2 problèmes Medium", emoji: "🧠", countable: true, targetCount: 2 },
   { id: "ml",       label: "ML / System Design", target: "45 min (alterner)", emoji: "📐" },
   { id: "sport",    label: "Sport",              target: "Séance complète",   emoji: "💪" },
@@ -12,7 +17,29 @@ export const TASKS = [
   { id: "reading",  label: "Lecture Zero to One", target: "20 min",           emoji: "📖" },
 ];
 
-export const TASK_COUNT = TASKS.length;
+// Thailand (Jul 24 → Aug 24): 2h/day max — NeetCode + reading only.
+const TASKS_THAILAND = [
+  { id: "leetcode", label: "LeetCode", target: "2 problèmes", emoji: "🧠", countable: true, targetCount: 2 },
+  { id: "reviews",  label: "Révisions SM-2", target: "Toutes les révisions dues", emoji: "🔁" },
+  { id: "reading",  label: "Lecture", target: "20 min", emoji: "📖" },
+];
+
+// Final rush (Aug 25 → interviews): full interview-prep days.
+const TASKS_RUSH = [
+  { id: "leetcode", label: "LeetCode", target: "4 problèmes", emoji: "🧠", countable: true, targetCount: 4 },
+  { id: "reviews",  label: "Révisions SM-2", target: "Toutes les révisions dues", emoji: "🔁" },
+  { id: "ml",       label: "ML / System Design", target: "45 min (alterner)", emoji: "📐" },
+  { id: "pitch",    label: "Pitch anglais / Mock", target: "30 min", emoji: "🎤" },
+  { id: "sport",    label: "Sport", target: "Séance complète", emoji: "💪" },
+];
+
+const thailand = PLAN_PHASES.find((p) => p.id === "thailand");
+
+export const tasksForDate = (key) => {
+  if (key < thailand.start) return TASKS_LEGACY;
+  if (key <= thailand.end) return TASKS_THAILAND;
+  return TASKS_RUSH;
+};
 
 const pad = (n) => String(n).padStart(2, "0");
 export const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -25,12 +52,12 @@ const blankTaskState = (task) => ({
   count: task.countable ? 0 : null,
 });
 
-const blankDay = () => ({
-  tasks: Object.fromEntries(TASKS.map((t) => [t.id, blankTaskState(t)])),
+const blankDay = (key) => ({
+  tasks: Object.fromEntries(tasksForDate(key).map((t) => [t.id, blankTaskState(t)])),
 });
 
-const ensureDay = (day) => {
-  const base = blankDay();
+const ensureDay = (day, key) => {
+  const base = blankDay(key);
   if (!day) return base;
   return {
     ...base,
@@ -42,14 +69,14 @@ const ensureDay = (day) => {
   };
 };
 
-export const isDayComplete = (day) => {
+export const isDayComplete = (day, key) => {
   if (!day?.tasks) return false;
-  return TASKS.every((t) => day.tasks[t.id]?.done);
+  return tasksForDate(key).every((t) => day.tasks[t.id]?.done);
 };
 
-const completedCount = (day) => {
+const completedCount = (day, key) => {
   if (!day?.tasks) return 0;
-  return TASKS.reduce((acc, t) => acc + (day.tasks[t.id]?.done ? 1 : 0), 0);
+  return tasksForDate(key).reduce((acc, t) => acc + (day.tasks[t.id]?.done ? 1 : 0), 0);
 };
 
 const computeStreaks = (history) => {
@@ -59,7 +86,7 @@ const computeStreaks = (history) => {
   let run = 0;
   let prev = null;
   for (const k of days) {
-    const complete = isDayComplete(history[k]);
+    const complete = isDayComplete(history[k], k);
     if (!complete) {
       run = 0;
       prev = k;
@@ -82,11 +109,11 @@ const computeStreaks = (history) => {
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
   const todayK = dateKey(cursor);
-  if (isDayComplete(history[todayK])) current += 1;
+  if (isDayComplete(history[todayK], todayK)) current += 1;
   cursor.setDate(cursor.getDate() - 1);
   while (true) {
     const k = dateKey(cursor);
-    if (isDayComplete(history[k])) {
+    if (isDayComplete(history[k], k)) {
       current += 1;
       cursor.setDate(cursor.getDate() - 1);
     } else {
@@ -98,16 +125,16 @@ const computeStreaks = (history) => {
 };
 
 const loadInitial = () => {
+  const today = todayKey();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     const history = parsed?.history || {};
-    const today = todayKey();
-    if (!history[today]) history[today] = blankDay();
-    else history[today] = ensureDay(history[today]);
+    if (!history[today]) history[today] = blankDay(today);
+    else history[today] = ensureDay(history[today], today);
     return { history };
   } catch {
-    return { history: { [todayKey()]: blankDay() } };
+    return { history: { [today]: blankDay(today) } };
   }
 };
 
@@ -135,17 +162,16 @@ export const useDailyChallenge = () => {
         lastDayRef.current = t;
         setState((prev) => {
           const history = { ...prev.history };
-          const yesterday = ensureDay(history[prevDay]);
+          const yesterday = ensureDay(history[prevDay], prevDay);
           const frozenTasks = { ...yesterday.tasks };
-          for (const task of TASKS) {
-            const ts = frozenTasks[task.id];
+          for (const [taskId, ts] of Object.entries(frozenTasks)) {
             if (ts?.runningSince) {
               const elapsed = Math.floor((Date.now() - ts.runningSince) / 1000);
-              frozenTasks[task.id] = { ...ts, time: (ts.time || 0) + elapsed, runningSince: null };
+              frozenTasks[taskId] = { ...ts, time: (ts.time || 0) + elapsed, runningSince: null };
             }
           }
           history[prevDay] = { ...yesterday, tasks: frozenTasks };
-          if (!history[t]) history[t] = blankDay();
+          if (!history[t]) history[t] = blankDay(t);
           return { ...prev, history };
         });
       }
@@ -154,11 +180,12 @@ export const useDailyChallenge = () => {
   }, []);
 
   const today = todayKey();
-  const todayDay = useMemo(() => ensureDay(state.history[today]), [state.history, today]);
+  const todayTasks = useMemo(() => tasksForDate(today), [today]);
+  const todayDay = useMemo(() => ensureDay(state.history[today], today), [state.history, today]);
 
   const updateTask = useCallback((taskId, updater) => {
     setState((prev) => {
-      const day = ensureDay(prev.history[today]);
+      const day = ensureDay(prev.history[today], today);
       const current = day.tasks[taskId];
       const next = updater(current);
       return {
@@ -202,12 +229,12 @@ export const useDailyChallenge = () => {
   const setCount = useCallback((taskId, count) => {
     updateTask(taskId, (t) => {
       const safe = Math.max(0, Math.min(99, Number.isFinite(count) ? count : 0));
-      const task = TASKS.find((x) => x.id === taskId);
+      const task = tasksForDate(today).find((x) => x.id === taskId);
       // auto-mark done when target reached
       const autoDone = task?.countable && task.targetCount && safe >= task.targetCount;
       return { ...t, count: safe, done: autoDone ? true : t.done };
     });
-  }, [updateTask]);
+  }, [updateTask, today]);
 
   const liveTime = useCallback((taskState) => {
     if (!taskState) return 0;
@@ -216,13 +243,14 @@ export const useDailyChallenge = () => {
   }, [now]);
 
   const streaks = useMemo(() => computeStreaks(state.history), [state.history]);
-  const todayCompleted = completedCount(todayDay);
+  const todayCompleted = completedCount(todayDay, today);
 
   return {
     today,
     todayDay,
+    todayTasks,
     todayCompleted,
-    totalTasks: TASK_COUNT,
+    totalTasks: todayTasks.length,
     history: state.history,
     streaks,
     toggleDone,
