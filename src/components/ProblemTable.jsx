@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, Circle, Calendar, ExternalLink, Minus, Play, Square, Clock } from "lucide-react";
+import { nextDueReview } from "../utils/spacedRepetition";
+import { isoKey } from "../data/studyPlan";
 
 const DIFFICULTY_COLOR = {
   Easy: "text-green-600",
@@ -29,7 +31,7 @@ const ProblemTable = ({
   filterDifficulty,
   showOnlyDueToday,
 }) => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = isoKey(new Date()); // local date, not UTC
   const [expandedReview, setExpandedReview] = useState(null);
   // activeTimer: { problemId, startTime (ms) } | null
   const [activeTimer, setActiveTimer] = useState(null);
@@ -63,7 +65,9 @@ const ProblemTable = ({
     if (!showOnlyDueToday) return categoryMatch && difficultyMatch;
     const prob = progress[problem.id];
     if (!prob?.solved) return false;
-    const isDue = getReviewDueDates(prob).some((date, idx) => !prob.reviews?.[idx] && date <= today);
+    // Sequential reviews: only the next unchecked one can be due.
+    const next = nextDueReview(prob);
+    const isDue = !!next && next.date <= today;
     return categoryMatch && difficultyMatch && isDue;
   });
 
@@ -109,6 +113,12 @@ const ProblemTable = ({
             {filteredProblems.map((problem, index) => {
               const prob = progress[problem.id] || {};
               const dueDates = getReviewDueDates(prob);
+              // Reviews are sequential: a slot beyond the first unchecked one
+              // isn't "due" yet and its real date isn't known until earlier
+              // reviews are actually completed — lock it in the UI so it
+              // can't be checked out of order.
+              const liveIdx = (prob.reviews || []).findIndex((r) => !r);
+              const boundary = liveIdx === -1 ? 5 : liveIdx;
               const isTimingThis = activeTimer?.problemId === problem.id;
               const timeLogs = prob.timeLogs || [];
               const bestTime = timeLogs.length ? Math.min(...timeLogs.map((l) => l.duration)) : null;
@@ -247,13 +257,21 @@ const ProblemTable = ({
                           const overdue = !isCompleted && date < today;
                           const dueToday = !isCompleted && date === today;
                           const feeling = prob.feelings?.[idx];
+                          const locked = !isCompleted && idx > boundary;
                           const isExpanded =
                             expandedReview?.problemId === problem.id &&
                             expandedReview?.reviewIndex === idx;
 
                           return (
                             <div key={idx} className="flex flex-col items-center gap-1">
-                              {isExpanded ? (
+                              {locked ? (
+                                <div
+                                  title={`R${idx + 1} — unlocks after R${boundary + 1} is done`}
+                                  className="px-2 py-1 rounded text-xs border min-w-[40px] bg-gray-50 dark:bg-gray-800 text-gray-300 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed"
+                                >
+                                  R{idx + 1}
+                                </div>
+                              ) : isExpanded ? (
                                 <div className="flex gap-1">
                                   {["hard", "medium", "easy"].map((f) => (
                                     <button
@@ -303,20 +321,24 @@ const ProblemTable = ({
                                 </div>
                               )}
 
-                              <div
-                                className={`text-[10px] flex items-center gap-0.5 ${
-                                  isCompleted
-                                    ? "text-green-600 dark:text-green-400"
-                                    : overdue
-                                    ? "text-red-600 dark:text-red-400"
-                                    : dueToday
-                                    ? "text-yellow-600 dark:text-yellow-400"
-                                    : "text-gray-500 dark:text-gray-300"
-                                }`}
-                              >
-                                <Calendar size={10} />
-                                {formatDate(displayDate)}
-                              </div>
+                              {locked ? (
+                                <div className="text-[10px] text-gray-300 dark:text-gray-600">locked</div>
+                              ) : (
+                                <div
+                                  className={`text-[10px] flex items-center gap-0.5 ${
+                                    isCompleted
+                                      ? "text-green-600 dark:text-green-400"
+                                      : overdue
+                                      ? "text-red-600 dark:text-red-400"
+                                      : dueToday
+                                      ? "text-yellow-600 dark:text-yellow-400"
+                                      : "text-gray-500 dark:text-gray-300"
+                                  }`}
+                                >
+                                  <Calendar size={10} />
+                                  {formatDate(displayDate)}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
