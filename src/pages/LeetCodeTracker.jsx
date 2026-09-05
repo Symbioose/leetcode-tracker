@@ -16,8 +16,13 @@ import {
   computeNextSchedule,
   initialGaps,
   EF_INIT,
+  nextDueReview,
+  layoutRemaining,
+  REVIEW_HORIZON,
 } from "../utils/spacedRepetition";
 import { migrateToNeetcode150, reshapeProgress } from "../utils/migrateToNeetcode150";
+import { rescheduleReviews } from "../utils/rescheduleReviews";
+import { isoKey } from "../data/studyPlan";
 import { useActivity } from "../hooks/useActivity";
 import { useGistSync } from "../hooks/useGistSync";
 
@@ -36,6 +41,8 @@ const EMPTY_PROB = {
 
 // Run the migration once before mounting state — avoids stale reads.
 migrateToNeetcode150();
+// July 15 re-plan: re-layout every remaining review to finish by REVIEW_HORIZON.
+rescheduleReviews();
 
 const LeetCodeTracker = () => {
   const [progress, setProgress] = useState(() => {
@@ -71,12 +78,13 @@ const LeetCodeTracker = () => {
     }
   }, [progress]);
 
-  const today = new Date().toISOString().split("T")[0];
+  // Local date, not UTC — a 5am session in Bangkok must count as today there.
+  const today = isoKey(new Date());
   const problems = neetcode150;
   const currentProgress = progress[LIST_NAME] || {};
 
   const toggleComplete = (problemId, reviewIndex = null, feeling = null) => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = isoKey(new Date());
 
     setProgress((prev) => {
       const listProgress = prev[LIST_NAME] || {};
@@ -114,6 +122,9 @@ const LeetCodeTracker = () => {
           if (next.dueDate && reviewIndex + 1 < 5) {
             newReviewDueDates[reviewIndex + 1] = next.dueDate;
             newGaps[reviewIndex + 1] = next.gap;
+            // Re-anchor every later review on today's completion — kills any
+            // stale "overdue" dates left on R3–R5 by long-skipped problems.
+            layoutRemaining(newReviewDueDates, newReviews, reviewIndex + 1, next.dueDate);
           }
         } else {
           delete newDates[`review${reviewIndex + 1}`];
@@ -157,15 +168,21 @@ const LeetCodeTracker = () => {
     hard: problems.filter((p) => p.difficulty === "Hard" && currentProgress[p.id]?.solved).length,
   };
 
-  const getDueProblems = () =>
-    problems.filter((problem) => {
-      const prob = currentProgress[problem.id];
-      if (!prob?.solved) return false;
-      return getReviewDueDates(prob).some((date, idx) => !prob.reviews?.[idx] && date <= today);
-    }).length;
+  // Reviews are sequential: only each problem's next unchecked review can be
+  // due, so the session queue holds at most one item per problem.
+  const getDueItems = () => {
+    const items = [];
+    problems.forEach((problem) => {
+      const next = nextDueReview(currentProgress[problem.id]);
+      if (next && next.date <= today) {
+        items.push({ problem, reviewIndex: next.index });
+      }
+    });
+    return items;
+  };
 
   const recordTime = (problemId, durationSeconds) => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = isoKey(new Date());
     setProgress((prev) => {
       const listProgress = prev[LIST_NAME] || {};
       const current = listProgress[problemId] || { ...EMPTY_PROB };
@@ -175,20 +192,6 @@ const LeetCodeTracker = () => {
         [LIST_NAME]: { ...listProgress, [problemId]: { ...current, timeLogs } },
       };
     });
-  };
-
-  const getDueItems = () => {
-    const items = [];
-    problems.forEach((problem) => {
-      const prob = currentProgress[problem.id];
-      if (!prob?.solved) return;
-      getReviewDueDates(prob).forEach((date, idx) => {
-        if (!prob.reviews?.[idx] && date <= today) {
-          items.push({ problem, reviewIndex: idx });
-        }
-      });
-    });
-    return items;
   };
 
   const dueItems = getDueItems();
@@ -263,6 +266,12 @@ const LeetCodeTracker = () => {
                 <code className="mx-1 px-1 rounded bg-white/60 dark:bg-black/30">nextGap = round(prevGap × EF)</code>.
                 Plus tu maîtrises, plus l'écart s'allonge.
               </p>
+              <p>
+                Les révisions sont <strong>séquentielles</strong> : seule la prochaine révision
+                de chaque problème compte comme due. Et tout le cycle se termine au plus tard
+                le <strong>31 décembre 2026</strong> ({REVIEW_HORIZON}) — les intervalles se
+                compressent automatiquement à l'approche de l'horizon.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <h4 className="font-semibold mb-2">Schedule (medium, EF init 2.5)</h4>
@@ -299,7 +308,7 @@ const LeetCodeTracker = () => {
             easy: stats.easy,
             medium: stats.medium,
             hard: stats.hard,
-            dueToday: getDueProblems(),
+            dueToday: dueItems.length,
           }}
           problems={problems}
         />
