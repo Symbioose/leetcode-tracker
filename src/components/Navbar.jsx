@@ -22,6 +22,12 @@ const Navbar = () => {
             75 Hard
           </Link>
           <Link
+            to="/prep"
+            className="font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"
+          >
+            Prep
+          </Link>
+          <Link
             to="/patterns"
             className="font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"
           >

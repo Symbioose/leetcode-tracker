@@ -8,6 +8,7 @@ const SYNC_KEYS = [
   'leetcode-progress-v2',
   'daily-challenge-v1',
   'activity-log',
+  'internship-prep-v1',
   'study-plan-v2',
 ];
 
