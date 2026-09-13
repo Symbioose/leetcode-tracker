@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { PLAN_PHASES } from "../data/studyPlan";
 
 const STORAGE_KEY = "daily-challenge-v1";
 
@@ -33,11 +32,15 @@ const TASKS_RUSH = [
   { id: "sport",    label: "Sport", target: "Séance complète", emoji: "💪" },
 ];
 
-const thailand = PLAN_PHASES.find((p) => p.id === "thailand");
+// Frozen historical boundary — the Thailand phase no longer exists as a plan
+// phase (trip is over), but past days must keep being judged by the task
+// list that was live on them, or old streaks would break retroactively.
+const THAILAND_START = "2026-07-24";
+const THAILAND_END = "2026-08-24";
 
 export const tasksForDate = (key) => {
-  if (key < thailand.start) return TASKS_LEGACY;
-  if (key <= thailand.end) return TASKS_THAILAND;
+  if (key < THAILAND_START) return TASKS_LEGACY;
+  if (key <= THAILAND_END) return TASKS_THAILAND;
   return TASKS_RUSH;
 };
 

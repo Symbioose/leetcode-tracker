@@ -1,6 +1,8 @@
 // Single source of truth for the re-targeted study plan.
 // Re-planned July 15, 2026 → finish everything by September 30, 2026.
-// Three phases with different daily capacity (Thailand trip = max 2h/day).
+// Two phases: everything before the final rush (now history), then the rush
+// itself. The Thailand trip is over, so it's folded into the pre-rush phase
+// instead of standing on its own.
 // Adjust perDay / dates here; StudyPlan and the 75 Hard tracker both read this.
 
 export const PLAN_START = "2026-07-15";
@@ -15,19 +17,13 @@ export const PLAN_PHASES = [
     id: "preflight",
     name: "Pré-départ",
     start: "2026-07-15",
-    end: "2026-07-23",
-    perDay: 3,
-    hoursLabel: "3-4h / jour",
-    note: "À fond avant le départ",
-  },
-  {
-    id: "thailand",
-    name: "Thaïlande",
-    start: "2026-07-24",
     end: "2026-08-24",
-    perDay: 2,
-    hoursLabel: "2h / jour max",
-    note: "NeetCode + lecture uniquement",
+    // Blended rate: 9j @3/jour avant le départ + 32j @2/jour en Thaïlande,
+    // gardé égal à la somme d'origine pour ne pas fausser le calcul
+    // d'avance/retard rétroactivement.
+    perDay: 91 / 41,
+    hoursLabel: "2-3h / jour (moy.)",
+    note: "Pré-départ + Thaïlande — terminé",
   },
   {
     id: "rush",

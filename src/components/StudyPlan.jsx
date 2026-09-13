@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Target, TrendingUp, TrendingDown, Minus, CalendarDays, Home, Plane, Flame } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Minus, CalendarDays, Home, Flame } from 'lucide-react';
 import {
   PLAN_START,
   PLAN_TARGET,
@@ -22,18 +22,13 @@ const formatDate = (d) =>
 const formatShort = (iso) =>
   parseISO(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
-const PHASE_ICONS = { preflight: Home, thailand: Plane, rush: Flame };
+const PHASE_ICONS = { preflight: Home, rush: Flame };
 
 const PHASE_STYLES = {
   preflight: {
     seg: 'bg-blue-300 dark:bg-blue-800',
     icon: 'text-blue-600 dark:text-blue-400',
     active: 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20',
-  },
-  thailand: {
-    seg: 'bg-amber-300 dark:bg-amber-800',
-    icon: 'text-amber-600 dark:text-amber-400',
-    active: 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-900/20',
   },
   rush: {
     seg: 'bg-rose-300 dark:bg-rose-800',
@@ -96,7 +91,7 @@ const StudyPlan = ({ stats, activity }) => {
     const remaining = stats.total - stats.solved;
 
     // Distribute what's left proportionally to each phase's daily capacity:
-    // slipping in Thailand automatically raises the rush-phase target.
+    // falling behind in one phase automatically raises the next one's target.
     const fromK = todayK < PLAN_START ? PLAN_START : todayK;
     const remainingCap = capacityBetween(fromK, PLAN_TARGET);
     const scale = remaining > 0 && remainingCap > 0 ? remaining / remainingCap : 0;
