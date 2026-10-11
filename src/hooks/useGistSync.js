@@ -48,6 +48,7 @@ export const useGistSync = (progress, setProgress) => {
   const [lastSync, setLastSync] = useState(() => ls.get('gist-last-sync') || null);
   const [syncError, setSyncError] = useState(null);
   const debounceRef = useRef(null);
+  const restoringRef = useRef(false);
 
   const saveToken = useCallback((t) => {
     setTokenState(t);
@@ -107,13 +108,15 @@ export const useGistSync = (progress, setProgress) => {
     }
   }, [token, gistId, headers]);
 
-  const pull = useCallback(async () => {
-    if (!token || !gistId) return;
+  const pull = useCallback(async (overrideToken, overrideGistId) => {
+    const tok = overrideToken ?? token;
+    const gid = overrideGistId ?? gistId;
+    if (!tok || !gid) return;
     setStatus('syncing');
     setSyncError(null);
 
     try {
-      const res = await fetch(`${GIST_API}/${gistId}`, { headers: headers() });
+      const res = await fetch(`${GIST_API}/${gid}`, { headers: headers(tok) });
       if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
       const data = await res.json();
       const content = data.files?.[FILENAME]?.content;
@@ -136,6 +139,36 @@ export const useGistSync = (progress, setProgress) => {
     }
   }, [token, gistId, headers]);
 
+  // Reconnecting after a localStorage wipe must restore the existing backup,
+  // not push the empty local state over it (or into a fresh gist).
+  const connect = useCallback(async (tok) => {
+    restoringRef.current = true;
+    saveToken(tok);
+    setStatus('syncing');
+    setSyncError(null);
+    try {
+      let existing = gistId;
+      for (let page = 1; !existing && page <= 10; page++) {
+        const res = await fetch(`${GIST_API}?per_page=100&page=${page}`, { headers: headers(tok) });
+        if (!res.ok) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+        const list = await res.json();
+        existing = list.find((g) => g.files?.[FILENAME])?.id;
+        if (list.length < 100) break;
+      }
+      if (existing) {
+        setGistIdState(existing);
+        ls.set('gist-id', existing);
+        await pull(tok, existing);
+      } else {
+        restoringRef.current = false;
+        await push(tok, '');
+      }
+    } catch (e) {
+      setStatus('error');
+      setSyncError(e.message);
+    }
+  }, [gistId, headers, pull, push, saveToken]);
+
   const disconnect = useCallback(() => {
     saveToken('');
     setGistIdState('');
@@ -153,7 +186,9 @@ export const useGistSync = (progress, setProgress) => {
 
     const schedule = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => push(), 12000);
+      debounceRef.current = setTimeout(() => {
+        if (!restoringRef.current) push();
+      }, 12000);
     };
 
     schedule();
@@ -166,5 +201,5 @@ export const useGistSync = (progress, setProgress) => {
     };
   }, [progress, token, push]);
 
-  return { token, saveToken, gistId, push, pull, disconnect, status, lastSync, syncError };
+  return { token, saveToken, connect, gistId, push, pull, disconnect, status, lastSync, syncError };
 };

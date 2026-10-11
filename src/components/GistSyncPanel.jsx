@@ -15,7 +15,7 @@ const StatusIcon = ({ status }) => {
   return null;
 };
 
-const GistSyncPanel = ({ token, saveToken, gistId, push, pull, disconnect, status, lastSync, syncError }) => {
+const GistSyncPanel = ({ token, connect, gistId, push, pull, disconnect, status, lastSync, syncError }) => {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(token);
   const [showToken, setShowToken] = useState(false);
@@ -25,8 +25,7 @@ const GistSyncPanel = ({ token, saveToken, gistId, push, pull, disconnect, statu
   const handleConnect = () => {
     const t = draft.trim();
     if (!t) return;
-    saveToken(t);
-    push(t, undefined);
+    connect(t);
   };
 
   return (
@@ -140,7 +139,7 @@ const GistSyncPanel = ({ token, saveToken, gistId, push, pull, disconnect, statu
                   Push
                 </button>
                 <button
-                  onClick={pull}
+                  onClick={() => pull()}
                   disabled={status === 'syncing' || !gistId}
                   className="flex items-center justify-center gap-1.5 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg transition-colors"
                 >
