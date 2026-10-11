@@ -1,12 +1,12 @@
 // Single source of truth for the re-targeted study plan.
-// Re-planned July 15, 2026 → finish everything by September 30, 2026.
+// Re-planned July 15, 2026 → finish everything by October 31, 2026.
 // Two phases: everything before the final rush (now history), then the rush
 // itself. The Thailand trip is over, so it's folded into the pre-rush phase
 // instead of standing on its own.
 // Adjust perDay / dates here; StudyPlan and the 75 Hard tracker both read this.
 
 export const PLAN_START = "2026-07-15";
-export const PLAN_TARGET = "2026-09-30";
+export const PLAN_TARGET = "2026-10-31";
 
 // localStorage key holding { date, solved } — snapshot of progress when the
 // re-plan went live, used to compute ahead/behind honestly.
@@ -29,10 +29,10 @@ export const PLAN_PHASES = [
     id: "rush",
     name: "Rush final",
     start: "2026-08-25",
-    end: "2026-09-30",
+    end: "2026-10-31",
     perDay: 4,
     hoursLabel: "4-5h / jour",
-    note: "Sprint jusqu'à fin septembre",
+    note: "Sprint jusqu'à fin octobre",
   },
 ];
 

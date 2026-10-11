@@ -3,7 +3,7 @@
 
 // Re-planned July 15, 2026: readiness aligned with the study-plan target
 // (see src/data/studyPlan.js), applications cascade Sept → Nov.
-export const DEADLINE_READY = "2026-09-30";
+export const DEADLINE_READY = "2026-10-31";
 export const DEADLINE_FIRST_APP = "2026-09-01";
 
 export const KARPATHY_LESSONS = [
@@ -127,15 +127,15 @@ export const APPLICATIONS = [
   { id: "app-nvidia",     tier: "T1 US direct",   company: "NVIDIA",       role: "Deep Learning Intern",         location: "Santa Clara",      deadline: "2026-09-01" },
 
   // Tier 1 — US AI startups
-  { id: "app-anthropic-sf",   tier: "T1 US AI startups", company: "Anthropic",    role: "Intern",              location: "SF",            deadline: "2026-09-30" },
-  { id: "app-scale",      tier: "T1 US AI startups", company: "Scale AI",     role: "Intern",                  location: "SF",            deadline: "2026-09-30" },
-  { id: "app-perplexity", tier: "T1 US AI startups", company: "Perplexity",   role: "Intern",                  location: "SF",            deadline: "2026-09-30" },
-  { id: "app-cohere",     tier: "T1 US AI startups", company: "Cohere",       role: "Intern",                  location: "NYC/Toronto",   deadline: "2026-09-30" },
-  { id: "app-cursor",     tier: "T1 US AI startups", company: "Cursor",       role: "Intern",                  location: "SF",            deadline: "2026-09-30" },
-  { id: "app-replit",     tier: "T1 US AI startups", company: "Replit",       role: "Intern",                  location: "SF",            deadline: "2026-09-30" },
-  { id: "app-hf-nyc",     tier: "T1 US AI startups", company: "Hugging Face", role: "Intern",                  location: "NYC",           deadline: "2026-09-30" },
-  { id: "app-xai",        tier: "T1 US AI startups", company: "xAI",          role: "Intern",                  location: "SF/Memphis",    deadline: "2026-09-30" },
-  { id: "app-together",   tier: "T1 US AI startups", company: "Together AI",  role: "Intern",                  location: "SF",            deadline: "2026-09-30" },
+  { id: "app-anthropic-sf",   tier: "T1 US AI startups", company: "Anthropic",    role: "Intern",              location: "SF",            deadline: "2026-10-31" },
+  { id: "app-scale",      tier: "T1 US AI startups", company: "Scale AI",     role: "Intern",                  location: "SF",            deadline: "2026-10-31" },
+  { id: "app-perplexity", tier: "T1 US AI startups", company: "Perplexity",   role: "Intern",                  location: "SF",            deadline: "2026-10-31" },
+  { id: "app-cohere",     tier: "T1 US AI startups", company: "Cohere",       role: "Intern",                  location: "NYC/Toronto",   deadline: "2026-10-31" },
+  { id: "app-cursor",     tier: "T1 US AI startups", company: "Cursor",       role: "Intern",                  location: "SF",            deadline: "2026-10-31" },
+  { id: "app-replit",     tier: "T1 US AI startups", company: "Replit",       role: "Intern",                  location: "SF",            deadline: "2026-10-31" },
+  { id: "app-hf-nyc",     tier: "T1 US AI startups", company: "Hugging Face", role: "Intern",                  location: "NYC",           deadline: "2026-10-31" },
+  { id: "app-xai",        tier: "T1 US AI startups", company: "xAI",          role: "Intern",                  location: "SF/Memphis",    deadline: "2026-10-31" },
+  { id: "app-together",   tier: "T1 US AI startups", company: "Together AI",  role: "Intern",                  location: "SF",            deadline: "2026-10-31" },
 
   // Tier 2 — US company, EU office
   { id: "app-anthropic-eu", tier: "T2 EU offices",   company: "Anthropic",    role: "Intern",                  location: "London/Dublin", deadline: "2026-10-01" },
